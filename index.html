@@ -73,7 +73,10 @@ header{position:relative; z-index:1; padding:calc(env(safe-area-inset-top) + 8px
 .cal-head button{border:none; background:#f3efe6; border-radius:8px; width:28px;height:28px; cursor:pointer; font-size:13px; color:var(--ink);}
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center;}
 .cal-grid .cw{font-size:10px; color:var(--sub); padding:2px 0;}
-.cal-grid .cd{padding:6px 0; font-size:13px; border-radius:10px; cursor:pointer;}
+.cal-grid .cd{padding:4px 0 5px; font-size:13px; border-radius:10px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:2px;}
+.cal-grid .cdot{display:flex; gap:2px; justify-content:center; height:4px; margin-top:1px;}
+.cal-grid .cdot i{width:3px; height:3px; border-radius:50%; display:block;}
 .cal-grid .cd:hover{background:#f5f1e8;}
 .cal-grid .cd.sel{background:var(--ink); color:#fff; font-weight:700;}
 .cal-grid .cd.today{color:#e05a5a; font-weight:700;}
@@ -322,13 +325,6 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
     </div>
 
     <div class="sec">
-      <div class="sec-row"><span class="lb"><span class="ic">🔔</span>提醒</span>
-        <button class="switch" id="fRemind"></button></div>
-      <div class="sec-row"><span class="lb"><span class="ic">⏰</span>超过期限未完成</span>
-        <button class="switch" id="fDeadline"></button></div>
-    </div>
-
-    <div class="sec">
       <div class="sec-row"><span class="lb"><span class="ic">📑</span>子计划</span></div>
       <div class="sub-list" id="subList"></div>
       <div class="sub-add">
@@ -383,8 +379,8 @@ function seed(){
   var t=dstr(new Date());
   var plans=[
     {id:"p1",title:"学习",quad:"iu",date:t,time:{s:"19:00",e:"20:30"},repeat:"none",children:[{id:"p1c1",title:"背单词"}],remind:false,deadline:false,created:1},
-    {id:"p2",title:"健身",quad:"in",date:t,time:{s:"18:00",e:"19:00"},repeat:"daily",children:[],remind:true,deadline:false,created:2},
-    {id:"p3",title:"回工作邮件",quad:"un",date:t,time:null,repeat:"weekday",children:[],remind:false,deadline:true,created:3},
+    {id:"p2",title:"健身",quad:"in",date:t,time:{s:"18:00",e:"19:00"},repeat:"daily",children:[],created:2},
+    {id:"p3",title:"回工作邮件",quad:"un",date:t,time:null,repeat:"weekday",children:[],created:3},
     {id:"p4",title:"整理书架",quad:"nn",date:t,time:null,repeat:"none",children:[],remind:false,deadline:false,created:4},
     {id:"p5",title:"喝水 8 杯",quad:"nn",date:t,time:null,repeat:"daily",children:[],remind:false,deadline:false,created:5}
   ];
@@ -460,7 +456,10 @@ function renderCal(){
   for(var i=0;i<start;i++) html+='<div class="cd blank"></div>';
   for(var d=1;d<=dim;d++){
     var ds=y+"-"+pad(m+1)+"-"+pad(d);
-    html+='<div class="cd'+(ds===state.sel?" sel":"")+(ds===today?" today":"")+'" data-ds="'+ds+'">'+d+'</div>';
+    var ps=plansFor(ds), seen={}, dots="";
+    ps.forEach(function(p){ if(!seen[p.quad]){ seen[p.quad]=1; dots+='<i style="background:'+QUADS[p.quad].color+'"></i>'; } });
+    html+='<div class="cd'+(ds===state.sel?" sel":"")+(ds===today?" today":"")+'" data-ds="'+ds+'">'+
+      '<span>'+d+'</span><span class="cdot">'+dots.slice(0,4)+'</span></div>';
   }
   $("#calGrid").innerHTML=html;
 }
@@ -488,8 +487,6 @@ function planHTML(p,ds,isChild){
     '<div class="plan-meta">';
   if(tm) h+='<span class="chip time">🕐 '+tm.s+"-"+tm.e+'</span>';
   if(p.repeat!=="none") h+='<span class="chip">🔁 '+({daily:"每天",weekday:"工作日",weekly:"每周"})[p.repeat]+'</span>';
-  if(p.remind) h+='<span class="chip">🔔</span>';
-  if(p.deadline && !done) h+='<span class="chip over">⏰ 超期未完成</span>';
   h+='</div>';
   if(!isChild && p.children && p.children.length){
     h+='<div class="child">';
@@ -713,8 +710,6 @@ function openSheet(id){
     timeOn: !!(editing&&editing.time),
     start: editing&&editing.time?editing.time.s:"09:00",
     end: editing&&editing.time?editing.time.e:"10:00",
-    remind: !!(editing&&editing.remind),
-    deadline: !!(editing&&editing.deadline)
   };
   $$("#quadPick button").forEach(function(b){ b.classList.toggle("on", b.dataset.q===draft.quad); });
   $$("#dateTabs button").forEach(function(b){ b.classList.toggle("on", b.dataset.dt===draft.dateType); });
@@ -724,8 +719,6 @@ function openSheet(id){
   $("#fTimeOn").classList.toggle("on", draft.timeOn);
   $("#fTimeBox").classList.toggle("show", draft.timeOn);
   $("#fStart").value=draft.start; $("#fEnd").value=draft.end;
-  $("#fRemind").classList.toggle("on", draft.remind);
-  $("#fDeadline").classList.toggle("on", draft.deadline);
   renderSubs();
   $("#mask").classList.add("open");
 }
@@ -760,8 +753,6 @@ $("#fRepeat").addEventListener("click",function(e){
   $$("#fRepeat button").forEach(function(x){x.classList.toggle("on",x===b);});
 });
 $("#fTimeOn").addEventListener("click",function(){ draft.timeOn=!draft.timeOn; this.classList.toggle("on",draft.timeOn); $("#fTimeBox").classList.toggle("show",draft.timeOn); });
-$("#fRemind").addEventListener("click",function(){ draft.remind=!draft.remind; this.classList.toggle("on",draft.remind); });
-$("#fDeadline").addEventListener("click",function(){ draft.deadline=!draft.deadline; this.classList.toggle("on",draft.deadline); });
 $("#fSubAdd").addEventListener("click",function(){
   var v=$("#fSubInput").value.trim(); if(!v) return;
   draftSubs.push({id:uid(),title:v}); $("#fSubInput").value=""; renderSubs();
@@ -785,12 +776,12 @@ $("#fOk").addEventListener("click",function(){
   var date = draft.dateType==="inbox"? null : draft.date;
   if(editing){
     editing.title=title; editing.quad=draft.quad; editing.date=date;
-    editing.repeat=draft.repeat; editing.time=time; editing.remind=draft.remind; editing.deadline=draft.deadline;
+    editing.repeat=draft.repeat; editing.time=time;
     editing.children=draftSubs;
     if(!time){ /* 保留按日覆盖 */ }
   }else{
     state.plans.push({id:uid(),title:title,quad:draft.quad,date:date,time:time,repeat:draft.repeat,
-      children:draftSubs,remind:draft.remind,deadline:draft.deadline,created:Date.now()});
+      children:draftSubs,created:Date.now()});
   }
   save(); closeSheet(); renderAll(); toast(editing?"已保存":"计划已创建 ✅");
 });
