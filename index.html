@@ -606,6 +606,11 @@ function cheerFor(ds){
     return !(p.children||[]).some(function(c){ return !isDone(c.id,ds); });
   });
   cheer(all? "今天全部完成啦！你超棒 🏆" : CHEERS[Math.floor(Math.random()*CHEERS.length)]);
+  if(all){   // 全部完成：再来一大波彩带
+    confetti(innerWidth/2, innerHeight*0.34, 260);
+    setTimeout(function(){ confetti(innerWidth*0.28, innerHeight*0.5, 140); },220);
+    setTimeout(function(){ confetti(innerWidth*0.72, innerHeight*0.5, 140); },420);
+  }
 }
 function popHearts(){
   var r=pet.getBoundingClientRect(), icons=["✨","❤️","🎉","⭐","💫"];
@@ -939,12 +944,16 @@ $("#inboxBtn").addEventListener("click",function(){
 var cvs=$("#confetti"), ctx=cvs.getContext("2d"), parts=[], raf=null;
 function sizeCvs(){ cvs.width=innerWidth*devicePixelRatio; cvs.height=innerHeight*devicePixelRatio; }
 sizeCvs(); addEventListener("resize",sizeCvs);
-function confetti(x,y){
-  var colors=["#e05a5a","#4a7fd6","#e8a13d","#4fa87b","#f2c94c","#bb6bd9"];
-  for(var i=0;i<70;i++){
-    var a=Math.random()*Math.PI*2, sp=2+Math.random()*6;
-    parts.push({x:x*devicePixelRatio,y:y*devicePixelRatio,vx:Math.cos(a)*sp*devicePixelRatio,vy:Math.sin(a)*sp*devicePixelRatio-4*devicePixelRatio,
-      g:0.18*devicePixelRatio,s:3+Math.random()*4,c:colors[i%colors.length],r:Math.random()*6,vr:(Math.random()-.5)*.3,life:60+Math.random()*30});
+function confetti(x,y,n){
+  var colors=["#e05a5a","#4a7fd6","#e8a13d","#4fa87b","#f2c94c","#bb6bd9","#7fd1e8","#ff9ec4"];
+  var count=n||180, dp=devicePixelRatio;
+  for(var i=0;i<count;i++){
+    var a=Math.random()*Math.PI*2, sp=2.5+Math.random()*9;
+    var shape=Math.random();
+    parts.push({x:x*dp,y:y*dp,vx:Math.cos(a)*sp*dp,vy:Math.sin(a)*sp*dp-6.5*dp,
+      g:(0.14+Math.random()*0.08)*dp,s:3+Math.random()*5,c:colors[i%colors.length],
+      r:Math.random()*6,vr:(Math.random()-.5)*.4,life:100+Math.random()*70,
+      shape:shape<0.55?"rect":(shape<0.85?"circle":"ribbon")});
   }
   if(!raf) raf=requestAnimationFrame(tick);
 }
@@ -952,10 +961,13 @@ function tick(){
   ctx.clearRect(0,0,cvs.width,cvs.height);
   parts=parts.filter(function(p){return p.life>0;});
   parts.forEach(function(p){
-    p.life--; p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.r+=p.vr;
+    p.life--; p.vy+=p.g; p.vx*=0.985; p.x+=p.vx; p.y+=p.vy; p.r+=p.vr;
     ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
-    ctx.globalAlpha=Math.max(0,Math.min(1,p.life/30));
-    ctx.fillStyle=p.c; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*1.6);
+    ctx.globalAlpha=Math.max(0,Math.min(1,p.life/45));
+    ctx.fillStyle=p.c;
+    if(p.shape==="circle"){ ctx.beginPath(); ctx.arc(0,0,p.s/2,0,6.2832); ctx.fill(); }
+    else if(p.shape==="ribbon"){ ctx.fillRect(-p.s*0.28,-p.s*1.2,p.s*0.56,p.s*2.4); }
+    else ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*1.6);
     ctx.restore();
   });
   if(parts.length) raf=requestAnimationFrame(tick); else {raf=null; ctx.clearRect(0,0,cvs.width,cvs.height);}
