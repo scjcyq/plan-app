@@ -183,6 +183,25 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
 .fab.dragging{transform:scale(1.05); cursor:grabbing; filter:drop-shadow(0 12px 18px rgba(58,53,45,.32));}
 .fab img{display:block; width:100%; height:100%; object-fit:contain; pointer-events:none; -webkit-user-drag:none;}
 .fab:active{transform:scale(.96);}
+/* 小人祝贺气泡 */
+.pet-say{position:absolute; left:50%; bottom:100%; transform:translate(-50%,6px) scale(.8);
+  background:#fff; color:var(--ink); font-size:12.5px; font-weight:800; line-height:1.35;
+  padding:8px 12px; border-radius:14px; white-space:nowrap; opacity:0; pointer-events:none;
+  box-shadow:0 4px 14px rgba(58,53,45,.18); transition:opacity .18s, transform .18s; z-index:5;}
+.pet-say::after{content:""; position:absolute; top:100%; left:50%; margin-left:-6px;
+  border:6px solid transparent; border-top-color:#fff;}
+.pet-say.right{left:auto; right:-6px; transform:translate(0,6px) scale(.8);}
+.pet-say.right::after{left:auto; right:18px; margin-left:0;}
+.pet-say.left{left:0; transform:translate(0,6px) scale(.8);}
+.pet-say.left::after{left:18px;}
+.pet-say.show{opacity:1; transform:translate(-50%,-6px) scale(1);}
+.pet-say.right.show,.pet-say.left.show{transform:translate(0,-6px) scale(1);}
+@keyframes petCheer{0%{transform:translateY(0) scale(1);}22%{transform:translateY(-16px) scale(1.05);}
+  45%{transform:translateY(0) scale(.97);}68%{transform:translateY(-8px) scale(1.02);}100%{transform:translateY(0) scale(1);}}
+.fab.cheer{animation:petCheer .95s ease;}
+@keyframes petWig{0%,100%{transform:rotate(0);}30%{transform:rotate(-6deg);}70%{transform:rotate(6deg);}}
+.fab.cheer img{animation:petWig .55s ease .35s;}
+.pet-heart{position:fixed; z-index:95; pointer-events:none; font-size:18px; will-change:transform,opacity;}
 
 /* ---------- 弹窗 ---------- */
 .mask{position:fixed; inset:0; background:rgba(30,26,18,.45); z-index:100; display:none; align-items:flex-end; justify-content:center;}
@@ -299,6 +318,7 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
 
   <div class="fab" id="fab" role="button" tabindex="0" aria-label="新建计划（可拖动）">
     <img src="pet.png" alt="">
+    <div class="pet-say" id="petSay"></div>
   </div>
 </div>
 
@@ -417,6 +437,11 @@ function effTime(p,ds){
 function setTime(id,ds,t){
   state.ov[ds]=state.ov[ds]||{};
   state.ov[ds][id]=t; save();
+}
+function clearOvFor(id){
+  Object.keys(state.ov||{}).forEach(function(ds){
+    if(state.ov[ds] && Object.prototype.hasOwnProperty.call(state.ov[ds],id)) delete state.ov[ds][id];
+  });
 }
 function matchDate(p,ds){
   if(!p.date) return false;
@@ -549,9 +574,57 @@ function onToggle(id,el){
   if(isDone(id,ds)){
     if(el){ var r=el.getBoundingClientRect(); confetti(r.left+r.width/2, r.top+r.height/2); }
     var p2=findPlan(id);
-    if(p2) toast("太棒了！完成「"+p2.title+"」🎉");
+    if(p2) toast("完成「"+p2.title+"」🎉");
+    cheerFor(ds);
   }
   renderAll();
+}
+/* 小人祝贺：气泡 + 弹跳 + 小心心 */
+var CHEERS=["太棒了！又完成一项 ✨","干得漂亮！继续加油 💪","你真厉害，坚持住 🌟",
+  "完成啦，喝口水歇一会儿 ☕","又前进一小步，很棒 🎉","厉害，今天的你在发光 💫"];
+var sayTimer=null;
+function cheer(msg){
+  var el=$("#petSay"), w=el.offsetWidth;
+  el.textContent=msg;
+  el.classList.remove("right","left");
+  if(petPos){
+    var cx=petPos.x+pet.offsetWidth/2;
+    if(cx+w/2>innerWidth-8) el.classList.add("right");
+    else if(cx-w/2<8) el.classList.add("left");
+  }
+  el.classList.add("show");
+  pet.classList.remove("cheer"); void pet.offsetWidth; pet.classList.add("cheer");
+  popHearts();
+  if(navigator.vibrate) navigator.vibrate([12,60,12]);
+  clearTimeout(sayTimer);
+  sayTimer=setTimeout(function(){ el.classList.remove("show"); pet.classList.remove("cheer"); },2800);
+}
+function cheerFor(ds){
+  var list=plansFor(ds);
+  var all = list.length && list.every(function(p){
+    if(!isDone(p.id,ds)) return false;
+    return !(p.children||[]).some(function(c){ return !isDone(c.id,ds); });
+  });
+  cheer(all? "今天全部完成啦！你超棒 🏆" : CHEERS[Math.floor(Math.random()*CHEERS.length)]);
+}
+function popHearts(){
+  var r=pet.getBoundingClientRect(), icons=["✨","❤️","🎉","⭐","💫"];
+  for(var i=0;i<6;i++){
+    (function(i){
+      var s=document.createElement("div");
+      s.className="pet-heart"; s.textContent=icons[i%icons.length];
+      var x=r.left+r.width/2+(Math.random()-.5)*r.width*.6, y=r.top+r.height*.3;
+      s.style.left=(x-9)+"px"; s.style.top=y+"px";
+      document.body.appendChild(s);
+      var dx=(Math.random()-.5)*80, dy=-40-Math.random()*55, life=0;
+      var t=setInterval(function(){
+        life++;
+        s.style.transform="translate("+(dx*life/26)+"px,"+(dy*life/26)+"px) scale("+Math.max(.2,1-life/34)+")";
+        s.style.opacity=Math.max(0,1-life/26);
+        if(life>=26){ clearInterval(t); s.remove(); }
+      },28);
+    })(i);
+  }
 }
 function deletePlanById(id){
   for(var i=0;i<state.plans.length;i++){
@@ -715,14 +788,15 @@ function openSheet(id){
   $("#sheetTitle").textContent = editing? "编辑计划":"新建计划";
   $("#fTitle").value = editing? editing.title:"";
   $("#fDel").style.display = editing?"block":"none";
+  var et = editing? effTime(editing, state.sel) : null;   // 当天实际生效的时间段（含拖动排的）
   draft = {
     quad: editing?editing.quad:"iu",
     dateType: editing? (editing.date? (editing.date===dstr(new Date())?"today":(editing.date===addDays(dstr(new Date()),1)?"tomorrow":"other")) : "inbox") : "today",
     date: editing?editing.date:dstr(new Date()),
     repeat: editing?editing.repeat:"none",
-    timeOn: !!(editing&&editing.time),
-    start: editing&&editing.time?editing.time.s:"09:00",
-    end: editing&&editing.time?editing.time.e:"10:00",
+    timeOn: !!et,
+    start: et?et.s:"09:00",
+    end: et?et.e:"10:00",
   };
   $$("#quadPick button").forEach(function(b){ b.classList.toggle("on", b.dataset.q===draft.quad); });
   $$("#dateTabs button").forEach(function(b){ b.classList.toggle("on", b.dataset.dt===draft.dateType); });
@@ -791,10 +865,12 @@ $("#fOk").addEventListener("click",function(){
     editing.title=title; editing.quad=draft.quad; editing.date=date;
     editing.repeat=draft.repeat; editing.time=time;
     editing.children=draftSubs;
-    if(!time){ /* 保留按日覆盖 */ }
+    clearOvFor(editing.id);          // 清掉当天手工拖动的时间段，让新设置生效
   }else{
-    state.plans.push({id:uid(),title:title,quad:draft.quad,date:date,time:time,repeat:draft.repeat,
-      children:draftSubs,created:Date.now()});
+    var np={id:uid(),title:title,quad:draft.quad,date:date,time:time,repeat:draft.repeat,
+      children:draftSubs,created:Date.now()};
+    state.plans.push(np);
+    clearOvFor(np.id);
   }
   save(); closeSheet(); renderAll(); toast(editing?"已保存":"计划已创建 ✅");
 });
