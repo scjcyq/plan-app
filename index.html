@@ -227,6 +227,16 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
 #toast{position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:rgba(40,35,26,.88); color:#fff;
   font-size:13px; padding:9px 16px; border-radius:999px; z-index:300; opacity:0; pointer-events:none; transition:.25s; max-width:80%; text-align:center;}
 #toast.show{opacity:1;}
+/* 长按删除确认框 */
+.mask.center{align-items:center;}
+.dlg{width:78%; max-width:300px; background:#fff; border-radius:20px; padding:18px 16px 12px; text-align:center;
+  box-shadow:0 12px 30px rgba(0,0,0,.18); animation:up .2s ease; margin-bottom:14px;}
+.dlg h4{margin:0 0 4px; font-size:15px;}
+.dlg p{margin:0 0 14px; font-size:12px; color:#9a927f;}
+.dlg-btns{display:flex; gap:10px;}
+.dlg-btns button{flex:1; border:none; border-radius:12px; padding:11px 0; font-size:14px; font-weight:800; cursor:pointer;}
+#delNo{background:#efeae0; color:#9a927f;}
+#delYes{background:#e05a5a; color:#fff;}
 #confetti{position:fixed; inset:0; z-index:400; pointer-events:none;}
 </style>
 </head>
@@ -334,17 +344,6 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
     </div>
   </div>
 </div>
-
-/* 长按删除确认框 */
-.mask.center{align-items:center;}
-.dlg{width:78%; max-width:300px; background:#fff; border-radius:20px; padding:18px 16px 12px; text-align:center;
-  box-shadow:0 12px 30px rgba(0,0,0,.18); animation:up .2s ease; margin-bottom:14px;}
-.dlg h4{margin:0 0 4px; font-size:15px;}
-.dlg p{margin:0 0 14px; font-size:12px; color:#9a927f;}
-.dlg-btns{display:flex; gap:10px;}
-.dlg-btns button{flex:1; border:none; border-radius:12px; padding:11px 0; font-size:14px; font-weight:800; cursor:pointer;}
-#delNo{background:#efeae0; color:#9a927f;}
-#delYes{background:#e05a5a; color:#fff;}
 
 <div class="mask center" id="delMask">
   <div class="dlg">
