@@ -526,6 +526,7 @@ function renderMatrix(){
   $("#inboxBtn").style.color=state.inbox?"#fff":"";
 }
 $("#quadGrid").addEventListener("click",function(e){
+  if(suppressClick) return;
   var c=e.target.closest(".circle"); 
   if(c){ onToggle(c.dataset.id, c); return; }
   var t=e.target.closest('[data-act="edit"]');
@@ -541,6 +542,14 @@ function onToggle(id,el){
     if(p2) toast("太棒了！完成「"+p2.title+"」🎉");
   }
   renderAll();
+}
+function deletePlanById(id){
+  for(var i=0;i<state.plans.length;i++){
+    if(state.plans[i].id===id){ state.plans.splice(i,1); return true; }
+    var cs=state.plans[i].children||[];
+    for(var j=0;j<cs.length;j++){ if(cs[j].id===id){ cs.splice(j,1); return true; } }
+  }
+  return false;
 }
 function findPlan(id){
   for(var i=0;i<state.plans.length;i++){
@@ -609,25 +618,31 @@ $("#delNo").addEventListener("click",function(){ $("#delMask").classList.remove(
 $("#delMask").addEventListener("click",function(e){ if(e.target===this){ this.classList.remove("open"); pendingDelete=null; } });
 $("#delYes").addEventListener("click",function(){
   if(pendingDelete){
-    state.plans=state.plans.filter(function(p){return p.id!==pendingDelete;});
+    deletePlanById(pendingDelete);
     pendingDelete=null; save();
     $("#delMask").classList.remove("open");
     renderAll(); toast("已删除 🗑");
   }
 });
 function onDown(e){
-  var el=e.target.closest(".drag-plan") || e.target.closest(".tl-plan");
-  if(!el) return;
-  if(e.target.closest(".mini")) return;
   if(suppressClick) return;
-  drag={id:el.dataset.id, el:el, sx:e.clientX, sy:e.clientY, moved:false, ghost:null,
-        from:el.classList.contains("tl-plan")?"tl":"un"};
+  if(e.target.closest(".mini") || e.target.closest(".circle")) return;
+  var el=e.target.closest(".drag-plan") || e.target.closest(".tl-plan");
+  var noDrag=false;
+  if(!el){ el=e.target.closest("#quadGrid .plan"); noDrag=true; }
+  if(!el) return;
+  drag={id:el.dataset.id, el:el, sx:e.clientX, sy:e.clientY, moved:false, ghost:null, noDrag:noDrag,
+        from:el.classList.contains("tl-plan")?"tl":(el.classList.contains("drag-plan")?"un":"mx")};
   drag.lp=setTimeout(function(){ longPress(drag.id); },600);
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
 }
 function onMove(e){
   if(!drag) return;
+  if(drag.noDrag){
+    if(Math.abs(e.clientX-drag.sx)+Math.abs(e.clientY-drag.sy)>8) cancelLP();
+    return;
+  }
   var dx=e.clientX-drag.sx, dy=e.clientY-drag.sy;
   if(!drag.moved && Math.abs(dx)+Math.abs(dy)>8){ cancelLP(); drag.moved=true;
     var r=drag.el.getBoundingClientRect();
