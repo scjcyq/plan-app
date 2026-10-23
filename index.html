@@ -147,13 +147,27 @@ main{flex:1; min-height:0; position:relative; z-index:1;}
 .drag-plan.done .t{text-decoration:line-through; color:#b7b0a0;}
 .drag-plan .grip{color:#cfc8b8; font-size:12px; letter-spacing:-2px;}
 .tl-scroll{flex:1; overflow-y:auto; min-height:0; padding:0 12px 14px; touch-action:pan-y;}
+.tl-grid{position:relative;}
 .hour-row{position:relative; height:56px; border-top:1px solid var(--line); display:flex; align-items:flex-start;}
 .hour-row .hl{flex:0 0 40px; font-size:10.5px; color:var(--sub); padding-top:2px; font-weight:600;}
-.hour-row .slot{flex:1; align-self:stretch; border-radius:10px; transition:background .12s;}
+.hour-row .slot{flex:1; position:relative; align-self:stretch; border-radius:10px; transition:background .12s;}
+/* 半小时刻度：淡淡的，不抢眼 */
+.hour-row .half{position:absolute; left:0; right:0; top:50%; height:1px; overflow:visible;
+  background-image:linear-gradient(90deg, rgba(150,142,124,.55) 0 5px, transparent 5px 9px);
+  background-size:9px 1px; background-repeat:repeat-x; pointer-events:none;}
+.hour-row .half::after{content:":30"; position:absolute; left:-38px; top:-6px; font-size:9px; color:rgba(150,142,124,.75); font-weight:600;}
 .hour-row.drop .slot{background:#eef3fb; outline:2px dashed #4a7fd6; outline-offset:-2px;}
-.tl-plan{position:absolute; left:46px; right:4px; top:3px; min-height:24px; background:var(--qc); border-radius:10px;
+.hour-row.drop .half{opacity:.4;}
+/* 计划块：绝对定位在整条时间轴上，可跨多个小时 */
+.tl-plans{position:absolute; left:46px; right:4px; top:0; height:100%; z-index:3; pointer-events:none;}
+.tl-plans.dragging *{pointer-events:none!important;}
+.tl-plan{position:absolute; left:0; right:0; top:0; min-height:24px; background:var(--qc); border-radius:10px;
   padding:4px 8px; color:#fff; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
-  box-shadow:0 2px 6px rgba(0,0,0,.12); overflow:hidden; display:flex; gap:6px; align-items:center;}
+  box-shadow:0 2px 6px rgba(0,0,0,.12); overflow:hidden; display:flex; gap:6px; align-items:center;
+  pointer-events:auto;}
+.tl-resize{position:absolute; left:0; right:0; bottom:0; height:14px; cursor:ns-resize; touch-action:none;}
+.tl-resize::after{content:""; position:absolute; left:50%; bottom:4px; margin-left:-9px; width:18px; height:3px;
+  border-radius:2px; background:rgba(255,255,255,.65);}
 .tl-plan .tt{font-size:11.5px; font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .tl-plan .tr{font-size:9.5px; opacity:.85;}
 .tl-plan .mini{flex:0 0 auto; width:15px;height:15px; border-radius:50%; border:1.5px solid rgba(255,255,255,.85);
@@ -649,6 +663,9 @@ function findPlan(id){
 }
 
 /* ---------- 时间轴页 ---------- */
+var ROW=56;                                  // 每小时高度(px)
+function toMin(s){ var p=String(s||"0:0").split(":"); return (+p[0])*60+(+p[1]); }
+function fmtMin(m){ m=Math.max(0,Math.min(1440,m)); return pad(Math.floor(m/60))+":"+pad(m%60); }
 function renderTimeline(){
   var ds=state.sel, ps=plansFor(ds);
   var un=ps.filter(function(p){return !effTime(p,ds);});
@@ -657,24 +674,27 @@ function renderTimeline(){
     return '<div class="drag-plan'+(isDone(p.id,ds)?" done":"")+'" data-id="'+p.id+'" style="--qc:'+QUADS[p.quad].color+'">'+
       '<span class="grip">⠿</span><span class="t">'+esc(p.title)+'</span><span style="font-size:10px;color:#b7b0a0">⠄</span></div>';
   }).join("") : '<div class="drop-hint">全部计划都已安排时间段 🎉</div>';
-  var tl=$("#tlScroll"), html="";
+  var tl=$("#tlScroll"), html='<div class="tl-grid">';
   for(var h=0;h<24;h++){
-    html+='<div class="hour-row" data-h="'+h+'"><div class="hl">'+pad(h)+':00</div><div class="slot"></div>';
-    ps.forEach(function(p){
-      var tm=effTime(p,ds); if(!tm) return;
-      var sh=+tm.s.split(":")[0], sm=+tm.s.split(":")[1], eh=+tm.e.split(":")[0], em=+tm.e.split(":")[1];
-      if(sh!==h) return;
-      var top=3+(sm/60)*50, dur=((eh*60+em)-(sh*60+sm))/60, height=Math.max(24,dur*50-5);
-      html+='<div class="tl-plan'+(isDone(p.id,ds)?" done":"")+'" data-id="'+p.id+'" style="--qc:'+QUADS[p.quad].color+';top:'+top+'px;height:'+height+'px">'+
-        '<button class="mini'+(isDone(p.id,ds)?" done":"")+'" data-act="toggle" data-id="'+p.id+'"><svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18.5 L20 6"/></svg></button>'+
-        '<span class="tt">'+esc(p.title)+'</span><span class="tr">'+tm.s+'</span></div>';
-    });
-    html+='</div>';
+    html+='<div class="hour-row" data-h="'+h+'"><div class="hl">'+pad(h)+':00</div>'+
+      '<div class="slot"><i class="half"></i></div></div>';
   }
+  html+='<div class="tl-plans">';
+  ps.forEach(function(p){
+    var tm=effTime(p,ds); if(!tm) return;
+    var sm=toMin(tm.s), em=toMin(tm.e); if(em<=sm) em=Math.min(1440,sm+30);
+    var top=sm/60*ROW+2, height=Math.max(26,(em-sm)/60*ROW-4);
+    html+='<div class="tl-plan'+(isDone(p.id,ds)?" done":"")+'" data-id="'+p.id+'" style="--qc:'+QUADS[p.quad].color+';top:'+top+'px;height:'+height+'px">'+
+      '<button class="mini'+(isDone(p.id,ds)?" done":"")+'" data-act="toggle" data-id="'+p.id+'"><svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18.5 L20 6"/></svg></button>'+
+      '<span class="tt">'+esc(p.title)+'</span><span class="tr">'+tm.s+'</span>'+
+      '<span class="tl-resize" title="拖动拉长/缩短"></span></div>';
+  });
+  html+='</div>';
   if(ds===dstr(new Date())){
     var now=new Date(), mins=now.getHours()*60+now.getMinutes();
-    html+='<div class="now-line" style="top:'+(mins/60*56)+'px"></div>';
+    html+='<div class="now-line" style="top:'+(mins/60*ROW)+'px"></div>';
   }
+  html+='</div>';
   tl.innerHTML=html;
 }
 $("#tlScroll").addEventListener("click",function(e){
@@ -715,6 +735,7 @@ $("#delYes").addEventListener("click",function(){
 function onDown(e){
   if(suppressClick) return;
   if(e.target.closest(".mini") || e.target.closest(".circle")) return;
+  if(e.target.closest(".tl-resize")) return;     // 拉长手柄单独处理
   var el=e.target.closest(".drag-plan") || e.target.closest(".tl-plan");
   var noDrag=false;
   if(!el){ el=e.target.closest("#quadGrid .plan"); noDrag=true; }
@@ -742,14 +763,19 @@ function onMove(e){
     drag.el.style.opacity=".3";
   }
   if(drag.moved){
+    var pl=$(".tl-plans"); if(pl) pl.classList.add("dragging");   // 让落点命中小时行
     drag.ghost.style.left=e.clientX+"px";
     drag.ghost.style.top=e.clientY+"px";
     var t=document.elementFromPoint(e.clientX,e.clientY);
     $$(".hour-row.drop").forEach(function(x){x.classList.remove("drop");});
     var row=t&&t.closest?t.closest(".hour-row"):null;
     var zone=t&&t.closest?t.closest("#unZone"):null;
-    drag.target = row ? {type:"hour",h:+row.dataset.h,el:row} : (zone?{type:"un"}:null);
-    if(row) row.classList.add("drop");
+    if(row){                                     // 按落点在行的上半/下半，吸附到整点或半点
+      var r=row.getBoundingClientRect();
+      var half=(e.clientY-r.top) >= r.height/2 ? 30 : 0;
+      drag.target={type:"hour", h:+row.dataset.h, m:half, el:row};
+      row.classList.add("drop");
+    } else drag.target = zone?{type:"un"}:null;
   }
   e.preventDefault();
 }
@@ -759,17 +785,18 @@ function onUp(e){
   if(!drag) return;
   cancelLP();
   $$(".hour-row.drop").forEach(function(x){x.classList.remove("drop");});
+  var pl0=$(".tl-plans"); if(pl0) pl0.classList.remove("dragging");
   if(drag.moved){
     if(drag.target && drag.target.type==="hour"){
       var p=findPlan(drag.id), ds=state.sel;
       var tm=effTime(p,ds);
-      var dur=1;
-      if(tm){ var sh=+tm.s.split(":")[0], sm=+tm.s.split(":")[1], eh=+tm.e.split(":")[0], em=+tm.e.split(":")[1];
-        dur=Math.max(0.5,((eh*60+em)-(sh*60+sm))/60); }
-      var h=drag.target.h;
-      var sh2=h, eh2=Math.min(24,h+dur);
-      setTime(drag.id,ds,{s:pad(sh2)+":"+(dur%1?"30":"00"), e:pad(eh2)+":"+(eh2%1?"30":"00")});
-      toast("已安排到 "+pad(h)+":00");
+      var dur=60;                                   // 默认 1 小时
+      if(tm) dur=Math.max(30, toMin(tm.e)-toMin(tm.s));
+      var start=drag.target.h*60+(drag.target.m||0);
+      var end=Math.min(1440, start+dur);
+      if(end-start<30) start=Math.max(0,end-30);
+      setTime(drag.id,ds,{s:fmtMin(start), e:fmtMin(end)});
+      toast("已安排到 "+fmtMin(start));
     } else if(drag.target && drag.target.type==="un"){
       setTime(drag.id,state.sel,null);
       toast("已取消时间段");
@@ -784,6 +811,37 @@ function onUp(e){
   drag=null;
 }
 document.addEventListener("pointerdown", onDown, true);
+
+/* 拖动手柄拉长/缩短计划（按半小时吸附，可跨多个小时） */
+var rsz=null;
+$("#tlScroll").addEventListener("pointerdown",function(e){
+  var hd=e.target.closest(".tl-resize"); if(!hd) return;
+  var el=hd.closest(".tl-plan"); if(!el) return;
+  var p=findPlan(el.dataset.id), tm=p?effTime(p,state.sel):null; if(!tm) return;
+  rsz={id:el.dataset.id, el:el, y:e.clientY, s:toMin(tm.s), e:toMin(tm.e)};
+  e.preventDefault(); e.stopPropagation();
+  document.addEventListener("pointermove",onRszMove);
+  document.addEventListener("pointerup",onRszUp);
+});
+function onRszMove(e){
+  if(!rsz) return;
+  var delta=Math.round((e.clientY-rsz.y)/(ROW/2))*30;      // 每半小时一档
+  var end=Math.max(rsz.s+30, Math.min(1440, rsz.e+delta));
+  rsz.end=end;
+  rsz.el.style.height=Math.max(26,(end-rsz.s)/60*ROW-4)+"px";
+  var tr=rsz.el.querySelector(".tr"); if(tr) tr.textContent=fmtMin(end);
+  e.preventDefault();
+}
+function onRszUp(){
+  document.removeEventListener("pointermove",onRszMove);
+  document.removeEventListener("pointerup",onRszUp);
+  if(!rsz) return;
+  if(rsz.end && rsz.end!==rsz.e){
+    setTime(rsz.id,state.sel,{s:fmtMin(rsz.s), e:fmtMin(rsz.end)});
+    toast("时间段已改为 "+fmtMin(rsz.s)+"-"+fmtMin(rsz.end));
+  }
+  rsz=null; renderAll();
+}
 
 /* ---------- 弹窗 ---------- */
 var editing=null, draftSubs=[], draft={};
