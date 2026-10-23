@@ -176,8 +176,9 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
   font-size:10px; color:var(--sub); cursor:pointer; padding:4px 0; font-weight:600;}
 .nav-item .ic{font-size:19px; line-height:1;}
 .nav-item.on{color:var(--ink);}
-.fab{flex:0 0 auto; width:56px;height:56px; border-radius:50%; border:none; background:var(--ink); color:#fff;
-  font-size:26px; cursor:pointer; margin:-26px 6px 0; box-shadow:0 6px 16px rgba(0,0,0,.22); display:flex; align-items:center; justify-content:center;}
+.fab{flex:0 0 auto; width:56px;height:56px; border-radius:50%; border:2.5px solid var(--ink); background:#fff; color:#fff;
+  font-size:26px; cursor:pointer; margin:-26px 6px 0; box-shadow:0 6px 16px rgba(0,0,0,.22); display:flex; align-items:center; justify-content:center; padding:5px;}
+.fab svg{display:block; width:100%; height:100%;}
 .fab:active{transform:scale(.94);}
 
 /* ---------- 弹窗 ---------- */
@@ -291,7 +292,31 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
   <nav>
     <button class="nav-item on" data-nav="matrix"><span class="ic">🗓</span>做计划</button>
     <button class="nav-item" data-nav="timeline"><span class="ic">📋</span>视图</button>
-    <button class="fab" id="fab">＋</button>
+    <button class="fab" id="fab" aria-label="新建计划">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <ellipse cx="60" cy="66" rx="37" ry="37" fill="#dde2ee"/>
+        <rect x="22" y="62" width="14" height="32" rx="7" fill="#dde2ee"/>
+        <rect x="84" y="62" width="14" height="32" rx="7" fill="#dde2ee"/>
+        <path d="M60 28 C57 19 65 16 68 22" stroke="#dde2ee" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <rect x="46" y="102" width="11" height="12" rx="5.5" fill="#ffeadb"/>
+        <rect x="63" y="102" width="11" height="12" rx="5.5" fill="#ffeadb"/>
+        <path d="M38 84 Q60 74 82 84 L84 104 Q60 112 36 104 Z" fill="#ffffff"/>
+        <path d="M38 84 Q60 74 82 84 L84 104 Q60 112 36 104 Z" fill="none" stroke="#e6e0d2" stroke-width="2"/>
+        <ellipse cx="40" cy="92" rx="7" ry="10" fill="#ffeadb" transform="rotate(-18 40 92)"/>
+        <ellipse cx="80" cy="92" rx="7" ry="10" fill="#ffeadb" transform="rotate(18 80 92)"/>
+        <rect x="52" y="86" width="16" height="13" rx="3.5" fill="#3f3f4e"/>
+        <circle cx="69" cy="92" r="3" fill="none" stroke="#3f3f4e" stroke-width="2"/>
+        <circle cx="60" cy="56" r="25" fill="#ffeadb"/>
+        <path d="M34 58 C35 30 85 30 86 58 C79 48 74 54 68 47 C62 40 52 40 46 47 C41 54 40 49 34 58 Z" fill="#dde2ee"/>
+        <ellipse cx="50" cy="58" rx="4.5" ry="6.5" fill="#4f7ecb"/>
+        <ellipse cx="70" cy="58" rx="4.5" ry="6.5" fill="#4f7ecb"/>
+        <circle cx="48.6" cy="55.2" r="1.9" fill="#fff"/>
+        <circle cx="68.6" cy="55.2" r="1.9" fill="#fff"/>
+        <circle cx="43" cy="65" r="3" fill="#ffb9b9" opacity=".6"/>
+        <circle cx="77" cy="65" r="3" fill="#ffb9b9" opacity=".6"/>
+        <path d="M56.5 65.5 Q60 68.5 63.5 65.5" stroke="#e08b8b" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      </svg>
+    </button>
   </nav>
 </div>
 
