@@ -176,10 +176,13 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
   font-size:10px; color:var(--sub); cursor:pointer; padding:4px 0; font-weight:600;}
 .nav-item .ic{font-size:19px; line-height:1;}
 .nav-item.on{color:var(--ink);}
-.fab{flex:0 0 auto; width:56px;height:56px; border-radius:50%; border:2.5px solid var(--ink); background:#fff; color:#fff;
-  font-size:26px; cursor:pointer; margin:-26px 6px 0; box-shadow:0 6px 16px rgba(0,0,0,.22); display:flex; align-items:center; justify-content:center; padding:5px;}
+/* 可拖动的 Q 版小人 */
+.fab{position:fixed; z-index:90; width:96px; height:102px; cursor:grab; touch-action:none;
+  user-select:none; -webkit-user-select:none;
+  filter:drop-shadow(0 6px 10px rgba(58,53,45,.22)); transition:transform .12s;}
+.fab.dragging{transform:scale(1.06); cursor:grabbing; filter:drop-shadow(0 10px 16px rgba(58,53,45,.3));}
 .fab svg{display:block; width:100%; height:100%;}
-.fab:active{transform:scale(.94);}
+.fab:active{transform:scale(.96);}
 
 /* ---------- 弹窗 ---------- */
 .mask{position:fixed; inset:0; background:rgba(30,26,18,.45); z-index:100; display:none; align-items:flex-end; justify-content:center;}
@@ -292,32 +295,56 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
   <nav>
     <button class="nav-item on" data-nav="matrix"><span class="ic">🗓</span>做计划</button>
     <button class="nav-item" data-nav="timeline"><span class="ic">📋</span>视图</button>
-    <button class="fab" id="fab" aria-label="新建计划">
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <ellipse cx="60" cy="66" rx="37" ry="37" fill="#dde2ee"/>
-        <rect x="22" y="62" width="14" height="32" rx="7" fill="#dde2ee"/>
-        <rect x="84" y="62" width="14" height="32" rx="7" fill="#dde2ee"/>
-        <path d="M60 28 C57 19 65 16 68 22" stroke="#dde2ee" stroke-width="4" fill="none" stroke-linecap="round"/>
-        <rect x="46" y="102" width="11" height="12" rx="5.5" fill="#ffeadb"/>
-        <rect x="63" y="102" width="11" height="12" rx="5.5" fill="#ffeadb"/>
-        <path d="M38 84 Q60 74 82 84 L84 104 Q60 112 36 104 Z" fill="#ffffff"/>
-        <path d="M38 84 Q60 74 82 84 L84 104 Q60 112 36 104 Z" fill="none" stroke="#e6e0d2" stroke-width="2"/>
-        <ellipse cx="40" cy="92" rx="7" ry="10" fill="#ffeadb" transform="rotate(-18 40 92)"/>
-        <ellipse cx="80" cy="92" rx="7" ry="10" fill="#ffeadb" transform="rotate(18 80 92)"/>
-        <rect x="52" y="86" width="16" height="13" rx="3.5" fill="#3f3f4e"/>
-        <circle cx="69" cy="92" r="3" fill="none" stroke="#3f3f4e" stroke-width="2"/>
-        <circle cx="60" cy="56" r="25" fill="#ffeadb"/>
-        <path d="M34 58 C35 30 85 30 86 58 C79 48 74 54 68 47 C62 40 52 40 46 47 C41 54 40 49 34 58 Z" fill="#dde2ee"/>
-        <ellipse cx="50" cy="58" rx="4.5" ry="6.5" fill="#4f7ecb"/>
-        <ellipse cx="70" cy="58" rx="4.5" ry="6.5" fill="#4f7ecb"/>
-        <circle cx="48.6" cy="55.2" r="1.9" fill="#fff"/>
-        <circle cx="68.6" cy="55.2" r="1.9" fill="#fff"/>
-        <circle cx="43" cy="65" r="3" fill="#ffb9b9" opacity=".6"/>
-        <circle cx="77" cy="65" r="3" fill="#ffb9b9" opacity=".6"/>
-        <path d="M56.5 65.5 Q60 68.5 63.5 65.5" stroke="#e08b8b" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-      </svg>
-    </button>
   </nav>
+
+  <div class="fab" id="fab" role="button" tabindex="0" aria-label="新建计划（可拖动）">
+    <svg viewBox="0 0 200 210" aria-hidden="true">
+      <ellipse cx="100" cy="196" rx="36" ry="7" fill="rgba(58,53,45,.10)"/>
+      <path d="M100 26 C95 12 107 8 112 16" stroke="#dfe4f0" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M100 24 C62 24 42 52 42 80 C42 102 38 130 32 152 C44 162 62 158 68 142 L68 98 L132 98 L132 142 C138 158 156 162 168 152 C162 130 158 102 158 80 C158 52 138 24 100 24 Z" fill="#e4e8f3"/>
+      <path d="M42 84 C42 118 38 140 34 152 C44 158 56 156 62 146 C52 128 48 106 42 84 Z" fill="#cbd1e0"/>
+      <path d="M158 84 C158 118 162 140 166 152 C156 158 144 156 138 146 C148 128 152 106 158 84 Z" fill="#cbd1e0"/>
+      <rect x="84" y="158" width="13" height="30" rx="6.5" fill="#ffeadb"/>
+      <rect x="103" y="158" width="13" height="30" rx="6.5" fill="#ffeadb"/>
+      <rect x="84" y="176" width="13" height="12" rx="6" fill="#ffffff" stroke="#e6e0d2" stroke-width="1.5"/>
+      <rect x="103" y="176" width="13" height="12" rx="6" fill="#ffffff" stroke="#e6e0d2" stroke-width="1.5"/>
+      <path d="M60 108 C48 118 44 136 50 150 C56 156 66 156 70 148 C64 134 64 122 66 112 Z" fill="#3a3540"/>
+      <path d="M140 108 C152 118 156 136 150 150 C144 156 134 156 130 148 C136 134 136 122 134 112 Z" fill="#3a3540"/>
+      <path d="M60 110 C54 120 52 134 56 146" stroke="#c94f4f" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M140 110 C146 120 148 134 144 146" stroke="#c94f4f" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <path d="M64 112 Q100 100 136 112 L140 158 Q100 170 60 158 Z" fill="#ffffff"/>
+      <path d="M64 112 Q100 100 136 112 L140 158 Q100 170 60 158 Z" fill="none" stroke="#e6e0d2" stroke-width="2"/>
+      <path d="M88 108 L100 120 L112 108 L100 104 Z" fill="#f4f6fb" stroke="#e6e0d2" stroke-width="1.5"/>
+      <circle cx="100" cy="130" r="2.2" fill="#d9d3c4"/>
+      <circle cx="100" cy="142" r="2.2" fill="#d9d3c4"/>
+      <path d="M66 118 C54 126 56 140 70 144 L82 140" fill="none" stroke="#ffeadb" stroke-width="11" stroke-linecap="round"/>
+      <path d="M134 118 C146 126 144 140 130 144 L118 140" fill="none" stroke="#ffeadb" stroke-width="11" stroke-linecap="round"/>
+      <rect x="86" y="128" width="28" height="22" rx="6" fill="#3f3f4e"/>
+      <circle cx="116" cy="138" r="4.5" fill="none" stroke="#3f3f4e" stroke-width="2.5"/>
+      <ellipse cx="100" cy="128" rx="14" ry="3.5" fill="#585870"/>
+      <path d="M94 120 C92 116 96 114 94 110" stroke="#c9c2b1" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M106 121 C104 117 108 115 106 111" stroke="#c9c2b1" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="100" cy="70" r="36" fill="#ffeadb"/>
+      <path d="M58 72 C58 32 142 32 142 72 C132 54 124 62 114 50 C106 42 94 42 86 50 C76 62 68 54 58 72 Z" fill="#e4e8f3"/>
+      <path d="M74 46 C78 42 84 40 90 40" stroke="#f6f8fc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M110 40 C116 40 122 42 126 46" stroke="#f6f8fc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M80 64 Q85 60 91 62" stroke="#b9bfd4" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M109 62 Q115 60 120 64" stroke="#b9bfd4" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <ellipse cx="83" cy="74" rx="8" ry="11" fill="#4f7ecb"/>
+      <ellipse cx="83" cy="78" rx="8" ry="7" fill="#5e93dd"/>
+      <ellipse cx="117" cy="74" rx="8" ry="11" fill="#4f7ecb"/>
+      <ellipse cx="117" cy="78" rx="8" ry="7" fill="#5e93dd"/>
+      <circle cx="80" cy="70" r="3.2" fill="#fff"/>
+      <circle cx="86" cy="79" r="1.6" fill="#fff" opacity=".9"/>
+      <circle cx="114" cy="70" r="3.2" fill="#fff"/>
+      <circle cx="120" cy="79" r="1.6" fill="#fff" opacity=".9"/>
+      <path d="M75 63 C79 59 87 59 91 63" stroke="#3a3a48" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M109 63 C113 59 121 59 125 63" stroke="#3a3a48" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <ellipse cx="72" cy="87" rx="5" ry="3" fill="#ffb9b9" opacity=".6"/>
+      <ellipse cx="128" cy="87" rx="5" ry="3" fill="#ffb9b9" opacity=".6"/>
+      <path d="M94 89 Q100 94 106 89" stroke="#e08b8b" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    </svg>
+  </div>
 </div>
 
 <div class="mask" id="mask">
@@ -816,7 +843,42 @@ $("#fOk").addEventListener("click",function(){
   }
   save(); closeSheet(); renderAll(); toast(editing?"已保存":"计划已创建 ✅");
 });
-$("#fab").addEventListener("click",function(){ openSheet(null); });
+/* Q 版小人：拖动 + 点按新建 */
+var pet=$("#fab"), petPos=null;
+try{ petPos=JSON.parse(localStorage.getItem("quadplan.pet")||"null"); }catch(e){}
+function applyPet(){
+  var w=pet.offsetWidth, h=pet.offsetHeight;
+  var maxX=innerWidth-w-6, maxY=innerHeight-h-6;
+  if(!petPos){ petPos={x:maxX, y:maxY-76}; }   // 默认：右下角、悬浮在底部导航上方
+  petPos.x=Math.max(4,Math.min(maxX,petPos.x));
+  petPos.y=Math.max(4,Math.min(maxY,petPos.y));
+  pet.style.left=petPos.x+"px"; pet.style.top=petPos.y+"px";
+}
+var petDrag=null;
+pet.addEventListener("pointerdown",function(e){
+  e.preventDefault();
+  petDrag={sx:e.clientX,sy:e.clientY,moved:false};
+  if(pet.setPointerCapture){ try{pet.setPointerCapture(e.pointerId);}catch(err){} }
+  pet.classList.add("dragging");
+});
+pet.addEventListener("pointermove",function(e){
+  if(!petDrag) return;
+  var dx=e.clientX-petDrag.sx, dy=e.clientY-petDrag.sy;
+  if(!petDrag.moved && Math.abs(dx)+Math.abs(dy)>8) petDrag.moved=true;
+  if(petDrag.moved){
+    petPos.x+=dx; petPos.y+=dy;
+    petDrag.sx=e.clientX; petDrag.sy=e.clientY;
+    applyPet();
+  }
+});
+pet.addEventListener("pointerup",function(){
+  pet.classList.remove("dragging");
+  if(petDrag && !petDrag.moved) openSheet(null);
+  if(petDrag && petDrag.moved){ try{localStorage.setItem("quadplan.pet",JSON.stringify(petPos));}catch(err){} }
+  petDrag=null;
+});
+window.addEventListener("resize",applyPet);
+applyPet();
 
 /* ---------- 视图切换 ---------- */
 function setView(v){
