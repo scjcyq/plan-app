@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f6f3ec">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>小计划 · 四象限</title>
 <style>
 :root{
@@ -165,8 +168,8 @@ main{flex:1; min-height:0; position:relative; z-index:1;}
   padding:4px 8px; color:#fff; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
   box-shadow:0 2px 6px rgba(0,0,0,.12); overflow:hidden; display:flex; gap:6px; align-items:center;
   pointer-events:auto;}
-.tl-resize{position:absolute; left:0; right:0; bottom:0; height:14px; cursor:ns-resize; touch-action:none;}
-.tl-resize::after{content:""; position:absolute; left:50%; bottom:4px; margin-left:-9px; width:18px; height:3px;
+.tl-resize{position:absolute; left:0; right:0; bottom:0; height:20px; cursor:ns-resize; touch-action:none;}
+.tl-resize::after{content:""; position:absolute; left:50%; bottom:5px; margin-left:-9px; width:18px; height:3px;
   border-radius:2px; background:rgba(255,255,255,.65);}
 .tl-plan .tt{font-size:11.5px; font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .tl-plan .tr{font-size:9.5px; opacity:.85;}
@@ -699,10 +702,16 @@ function renderTimeline(){
 }
 $("#tlScroll").addEventListener("click",function(e){
   if(suppressClick) return;
+  if(e.target.closest(".tl-resize")) return;     // 点在手柄上不打开编辑
   var c=e.target.closest('.mini');
   if(c){ onToggle(c.dataset.id,c); return; }
   var p=e.target.closest(".tl-plan");
-  if(p) openSheet(p.dataset.id);
+  if(p){
+    var r=p.getBoundingClientRect();
+    var zone=Math.min(26, r.height-14);          // 小计划也给编辑留点击区
+    if(e.clientY >= r.bottom-zone) return;       // 底部手柄区（容错触摸偏移）
+    openSheet(p.dataset.id);
+  }
 });
 
 /* 拖拽分配时间段 */
@@ -737,6 +746,10 @@ function onDown(e){
   if(e.target.closest(".mini") || e.target.closest(".circle")) return;
   if(e.target.closest(".tl-resize")) return;     // 拉长手柄单独处理
   var el=e.target.closest(".drag-plan") || e.target.closest(".tl-plan");
+  if(el && el.classList.contains("tl-plan")){    // 落在底部手柄区也交给 resize
+    var rr=el.getBoundingClientRect();
+    if(e.clientY >= rr.bottom-Math.min(26, rr.height-14)) return;
+  }
   var noDrag=false;
   if(!el){ el=e.target.closest("#quadGrid .plan"); noDrag=true; }
   if(!el) return;
@@ -815,8 +828,13 @@ document.addEventListener("pointerdown", onDown, true);
 /* 拖动手柄拉长/缩短计划（按半小时吸附，可跨多个小时） */
 var rsz=null;
 $("#tlScroll").addEventListener("pointerdown",function(e){
-  var hd=e.target.closest(".tl-resize"); if(!hd) return;
-  var el=hd.closest(".tl-plan"); if(!el) return;
+  var hd=e.target.closest(".tl-resize"), el=null;
+  if(hd) el=hd.closest(".tl-plan");
+  else{   // 触摸有偏移：点在计划底部手柄区内也算拖手柄
+    var pl=e.target.closest(".tl-plan");
+    if(pl){ var r=pl.getBoundingClientRect(); if(e.clientY >= r.bottom-Math.min(26, r.height-14)) el=pl; }
+  }
+  if(!el) return;
   var p=findPlan(el.dataset.id), tm=p?effTime(p,state.sel):null; if(!tm) return;
   rsz={id:el.dataset.id, el:el, y:e.clientY, s:toMin(tm.s), e:toMin(tm.e)};
   e.preventDefault(); e.stopPropagation();
