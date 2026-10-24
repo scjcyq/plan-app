@@ -101,6 +101,23 @@ header{position:relative; z-index:1; padding:calc(env(safe-area-inset-top) + 8px
   color:var(--sub); box-shadow:0 1px 4px rgba(0,0,0,.06); cursor:pointer; position:relative;}
 .inbox-btn .bdg{position:absolute; top:-4px; right:-4px; background:#e05a5a; color:#fff; font-size:9px;
   min-width:15px; height:15px; border-radius:999px; display:flex; align-items:center; justify-content:center; padding:0 3px;}
+.bell-btn{border:none; background:#fff; border-radius:12px; padding:6px 9px; font-size:14px; line-height:1;
+  box-shadow:0 1px 4px rgba(0,0,0,.06); cursor:pointer; position:relative; flex:0 0 auto;}
+.bell-btn.off{opacity:.45;}
+.bell-btn .bdg{position:absolute; top:-4px; right:-4px; background:#4a7fd6; color:#fff; font-size:9px;
+  min-width:15px; height:15px; border-radius:999px; display:flex; align-items:center; justify-content:center; padding:0 3px;}
+/* 通知设置面板 */
+.ntf-row{display:flex; align-items:center; gap:10px; padding:9px 0; font-size:13px; font-weight:600; border-bottom:1px dashed #f0ece1;}
+.ntf-row:last-child{border-bottom:none;}
+.ntf-row .lb{flex:1;}
+.ntf-topic{display:flex; gap:8px; align-items:center;}
+.ntf-topic input{flex:1; border:none; background:#f6f3ec; border-radius:10px; padding:9px 10px; font-size:13px; font-family:ui-monospace,Menlo,monospace; outline:none;}
+.ntf-mini{border:none; background:var(--ink); color:#fff; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; cursor:pointer;}
+.ntf-mini.ghost{background:#efeae0; color:var(--sub);}
+.ntf-tip{background:#f6f3ec; border-radius:12px; padding:10px 12px; font-size:11.5px; line-height:1.6; color:var(--sub);}
+.ntf-tip b{color:var(--ink);}
+.ntf-steps{margin:6px 0 0; padding-left:16px;}
+.ntf-steps li{margin-bottom:3px;}
 
 /* ---------- 主区域 ---------- */
 main{flex:1; min-height:0; position:relative; z-index:1;}
@@ -313,6 +330,7 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
       <button id="viewMatrixBtn" class="on" title="四象限">▦</button>
       <button id="viewTimelineBtn" title="时间轴">☰</button>
     </div>
+    <button class="bell-btn" id="bellBtn" title="提醒通知">🔔<span class="bdg" id="bellBadge" style="display:none">0</span></button>
   </div>
 
   <main>
@@ -395,6 +413,47 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
     <div class="dlg-btns">
       <button id="delNo">取消</button>
       <button id="delYes">删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="mask center" id="ntfMask">
+  <div class="sheet" style="max-height:92dvh">
+    <h3>🔔 提醒通知</h3>
+    <div class="ntf-tip" id="ntfTip">
+      通过 <b>ntfy</b>（免费推送服务）发送真正的 iPhone 系统通知，<b>应用关掉也能收到</b>。
+      <ol class="ntf-steps">
+        <li>App Store 搜 <b>ntfy</b> 安装并打开</li>
+        <li>点右上角 <b>+</b> → 订阅主题，粘贴下面的主题名</li>
+        <li>回来点「发一条测试」确认能收到</li>
+      </ol>
+    </div>
+    <div class="sec" style="margin-top:10px">
+      <div class="ntf-row"><span class="lb">开启系统推送提醒</span>
+        <button class="switch" id="ntfOn"></button></div>
+      <div class="ntf-row"><span class="lb">提前提醒</span>
+        <div class="seg2" id="ntfLead" style="margin:0; flex:0 0 auto; width:170px">
+          <button data-lead="0">准时</button>
+          <button data-lead="10" class="on">10 分钟</button>
+          <button data-lead="30">30 分钟</button>
+        </div></div>
+    </div>
+    <div class="sec">
+      <div class="ntf-row" style="display:block">
+        <div class="lb" style="margin-bottom:8px">推送主题（相当于密码，别告诉别人）</div>
+        <div class="ntf-topic">
+          <input id="ntfTopic" spellcheck="false">
+          <button class="ntf-mini" id="ntfCopy">复制</button>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px">
+        <button class="ntf-mini ghost" id="ntfTest" style="flex:1">发一条测试</button>
+        <button class="ntf-mini" id="ntfSync" style="flex:1">同步今天全部</button>
+      </div>
+      <div style="font-size:11px; color:var(--sub); margin-top:8px" id="ntfStatus">尚未安排提醒</div>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn-cancel" id="ntfClose">关闭</button>
     </div>
   </div>
 </div>
@@ -810,6 +869,7 @@ function onUp(e){
       if(end-start<30) start=Math.max(0,end-30);
       setTime(drag.id,ds,{s:fmtMin(start), e:fmtMin(end)});
       toast("已安排到 "+fmtMin(start));
+      var pd=findPlan(drag.id); if(pd) schedulePlan(pd,ds);
     } else if(drag.target && drag.target.type==="un"){
       setTime(drag.id,state.sel,null);
       toast("已取消时间段");
@@ -857,6 +917,7 @@ function onRszUp(){
   if(rsz.end && rsz.end!==rsz.e){
     setTime(rsz.id,state.sel,{s:fmtMin(rsz.s), e:fmtMin(rsz.end)});
     toast("时间段已改为 "+fmtMin(rsz.s)+"-"+fmtMin(rsz.end));
+    var pr=findPlan(rsz.id); if(pr) schedulePlan(pr,state.sel);
   }
   rsz=null; renderAll();
 }
@@ -953,7 +1014,9 @@ $("#fOk").addEventListener("click",function(){
     state.plans.push(np);
     clearOvFor(np.id);
   }
+  var saved = editing || state.plans[state.plans.length-1];
   save(); closeSheet(); renderAll(); toast(editing?"已保存":"计划已创建 ✅");
+  if(saved && saved.date) schedulePlan(saved, saved.date);
 });
 /* Q 版小人：拖动 + 点按新建 */
 var pet=$("#fab"), petPos=null;
@@ -1055,6 +1118,124 @@ function toast(msg){
   var t=$("#toast"); t.textContent=msg; t.classList.add("show");
   clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove("show");},1800);
 }
+
+/* ---------- 提醒通知（ntfy 真系统推送） ---------- */
+var NKEY="quadplan.notify";
+var ntf={on:false, topic:"", lead:10, sent:{}, inapp:{}};
+try{ var _n=JSON.parse(localStorage.getItem(NKEY)||"null"); if(_n) ntf=Object.assign(ntf,_n); }catch(e){}
+if(!ntf.topic) ntf.topic="plan-"+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,6);
+function saveNtf(){ try{localStorage.setItem(NKEY,JSON.stringify(ntf));}catch(e){} }
+function planStartTs(p,ds){
+  var tm=effTime(p,ds); if(!tm) return null;
+  var d=parseD(ds), s=tm.s.split(":");
+  return new Date(d.getFullYear(),d.getMonth(),d.getDate(),+s[0],+s[1],0,0).getTime();
+}
+function ntfySend(o){
+  var body={topic:ntf.topic, title:o.title||"计划提醒", message:o.msg||"", tags:["clock10"], priority:3,
+            actions:[{action:"view",label:"打开计划",url:location.href.split("?")[0]}]};
+  if(o.at && o.at>Date.now()+20000 && o.at<Date.now()+3*86400000) body.at=Math.floor(o.at/1000);
+  if(o.seq) body.sequence_id=o.seq;
+  return fetch("https://ntfy.sh/",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(function(r){return r.ok;}).catch(function(){return false;});
+}
+/* 为某天的某个计划安排提醒（同一计划改时间会覆盖旧提醒） */
+function schedulePlan(p,ds){
+  if(!ntf.on||!ntf.topic) return Promise.resolve(false);
+  var st=planStartTs(p,ds); if(!st) return Promise.resolve(false);
+  var at=st-ntf.lead*60000, now=Date.now();
+  var key=p.id+"|"+ds;
+  if(at < now-5*60000) return Promise.resolve(false);               // 太晚就不提醒了
+  if(ntf.sent[key] && ntf.sent[key].at===at) return Promise.resolve(false);
+  var q=QUADS[p.quad];
+  return ntfySend({
+    title:(ntf.lead? "还有 "+ntf.lead+" 分钟：" : "")+p.title,
+    msg:effTime(p,ds).s+"-"+effTime(p,ds).e+" · "+q.name,
+    at:at, seq:"plan-"+p.id+"-"+ds
+  }).then(function(ok){
+    if(ok){ ntf.sent[key]={at:at,st:st}; saveNtf(); updateBell(); }
+    return ok;
+  });
+}
+function syncDay(ds,silent){
+  if(!ntf.on){ if(!silent) toast("先打开上面的开关"); return Promise.resolve(0); }
+  var ps=plansFor(ds), jobs=[], n=0;
+  ps.forEach(function(p){ if(effTime(p,ds)) jobs.push(schedulePlan(p,ds).then(function(ok){ if(ok) n++; })); });
+  return Promise.all(jobs).then(function(){
+    if(!silent) toast(n? ("已安排 "+n+" 条提醒 🔔") : "当天没有带时间段的计划");
+    renderNtfStatus(); updateBell(); return n;
+  });
+}
+function updateBell(){
+  var ds=state.sel, c=0;
+  Object.keys(ntf.sent||{}).forEach(function(k){ if(k.split("|")[1]===ds) c++; });
+  var bd=$("#bellBadge");
+  if(ntf.on && c){ bd.style.display="flex"; bd.textContent=c; } else bd.style.display="none";
+  $("#bellBtn").classList.toggle("off", !ntf.on);
+}
+function renderNtfStatus(){
+  var ds=state.sel, c=0, next="";
+  Object.keys(ntf.sent||{}).forEach(function(k){
+    if(k.split("|")[1]!==ds) return; c++;
+    var t=ntf.sent[k].st; if(!next||t<next) next=t;
+  });
+  var el=$("#ntfStatus");
+  if(!ntf.on){ el.textContent="提醒已关闭"; return; }
+  if(!c){ el.textContent="当天还没有安排提醒，点「同步今天全部」"; return; }
+  var d=new Date(next);
+  el.textContent="当天已安排 "+c+" 条，下一个："+pad(d.getHours())+":"+pad(d.getMinutes())+" 的计划（提前 "+ntf.lead+" 分钟提醒）";
+}
+function openNtf(){
+  $("#ntfTopic").value=ntf.topic;
+  $("#ntfOn").classList.toggle("on", ntf.on);
+  $$("#ntfLead button").forEach(function(b){ b.classList.toggle("on", +b.dataset.lead===ntf.lead); });
+  renderNtfStatus(); updateBell();
+  $("#ntfMask").classList.add("open");
+}
+$("#bellBtn").addEventListener("click",openNtf);
+$("#ntfClose").addEventListener("click",function(){ $("#ntfMask").classList.remove("open"); });
+$("#ntfMask").addEventListener("click",function(e){ if(e.target===this) this.classList.remove("open"); });
+$("#ntfOn").addEventListener("click",function(){
+  ntf.on=!ntf.on; this.classList.toggle("on",ntf.on); saveNtf();
+  toast(ntf.on? "已开启系统推送提醒 🔔":"已关闭提醒");
+  if(ntf.on) syncDay(state.sel,true);
+  renderNtfStatus(); updateBell();
+});
+$("#ntfLead").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-lead]"); if(!b) return;
+  ntf.lead=+b.dataset.lead;
+  $$("#ntfLead button").forEach(function(x){x.classList.toggle("on",x===b);});
+  saveNtf(); toast("提前 "+ntf.lead+" 分钟提醒（下次安排生效）"); renderNtfStatus();
+});
+$("#ntfTopic").addEventListener("change",function(){
+  var v=this.value.trim(); if(!v) return;
+  ntf.topic=v; ntf.sent={}; saveNtf(); renderNtfStatus(); toast("主题已更新");
+});
+$("#ntfCopy").addEventListener("click",function(){
+  var v=ntf.topic;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(v).then(function(){toast("主题名已复制");},function(){toast("请长按输入框手动复制");});
+  } else toast("请长按输入框手动复制");
+});
+$("#ntfTest").addEventListener("click",function(){
+  ntfySend({title:"计划提醒已连通 ✅", msg:"接下来这个主题的提醒会准时送到你的 iPhone"})
+    .then(function(ok){ toast(ok? "测试通知已发出，看看手机收到没 📱":"发送失败，检查网络"); });
+});
+$("#ntfSync").addEventListener("click",function(){ syncDay(state.sel,false); });
+/* 应用内兜底：打开应用时，快开始的计划小人会提醒一次 */
+function checkInApp(){
+  var ds=state.sel, now=Date.now();
+  plansFor(ds).forEach(function(p){
+    if(!effTime(p,ds) || isDone(p.id,ds)) return;
+    var st=planStartTs(p,ds);
+    if(st-now<=10*60000 && st-now>-60000){
+      var k="in-"+p.id+"-"+ds;
+      if(ntf.inapp[k]) return;
+      ntf.inapp[k]=1; saveNtf();
+      cheer("马上就是「"+p.title+"」啦 ⏰");
+    }
+  });
+}
+setInterval(checkInApp,30000);
 
 /* ---------- 启动 ---------- */
 function renderAll(){ renderHeader(); renderMatrix(); renderTimeline(); }
