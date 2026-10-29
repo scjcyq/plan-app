@@ -148,6 +148,17 @@ main{flex:1; min-height:0; position:relative; z-index:1;}
 .plan-meta{display:flex; flex-wrap:wrap; gap:4px; margin-top:3px; align-items:center;}
 .chip{font-size:10px; color:#8a8271; background:#f0ece1; border-radius:6px; padding:2px 6px; display:inline-flex; align-items:center; gap:3px;}
 .chip.time{color:#4a7fd6; background:#e8effa;}
+/* 智能识别 */
+.ai-box{background:#eef3fb; border-radius:14px; padding:10px 12px; margin-bottom:12px;}
+.ai-box textarea{width:100%; box-sizing:border-box; border:none; background:#fff; border-radius:10px; padding:9px 10px;
+  font-size:13px; min-height:58px; resize:none; outline:none; box-shadow:inset 0 0 0 1.5px #dbe6f5; line-height:1.55; font-family:inherit;}
+.ai-row{display:flex; align-items:center; gap:8px; margin-top:8px;}
+.ai-btn{border:none; background:#4a7fd6; color:#fff; font-size:12.5px; font-weight:700; border-radius:9px; padding:8px 14px; flex:0 0 auto;}
+.ai-btn:active{opacity:.75;}
+.ai-hint{font-size:10.5px; color:#8aa4cc; line-height:1.4;}
+.extra-col{display:flex; flex-direction:column; gap:8px; margin-top:6px;}
+.extra-col input{border:none; background:#f6f3ec; border-radius:10px; padding:8px 10px; font-size:13px; outline:none;}
+.plan-note{font-size:11px; color:#a08c5a; margin-top:3px; line-height:1.45;}
 .chip.over{color:#e05a5a; background:#fbe9e9;}
 .child{margin-top:5px; padding-top:5px; border-top:1px dashed #ece5d5;}
 .child .plan{background:transparent; padding:3px 0; margin:0 0 2px;}
@@ -360,6 +371,13 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
 <div class="mask" id="mask">
   <div class="sheet" id="sheet">
     <h3 id="sheetTitle">新建计划</h3>
+    <div class="ai-box">
+      <textarea id="fRaw" placeholder="💡 直接粘贴一段话，例如：&#10;明天下午3点到5点在图书馆复习高数，记得带上学生证"></textarea>
+      <div class="ai-row">
+        <button class="ai-btn" id="aiBtn">⚡ 智能识别</button>
+        <span class="ai-hint">自动提取时间、地点、事项和注意事项</span>
+      </div>
+    </div>
     <input class="title-input" id="fTitle" placeholder="我准备做…" maxlength="60">
     <div class="date-tabs" id="dateTabs">
       <button data-dt="today" class="on">今天</button>
@@ -386,6 +404,14 @@ nav{display:flex; align-items:flex-end; justify-content:space-around; padding:6p
       <div class="time-set" id="fTimeBox">
         <input type="time" id="fStart" value="09:00">
         <input type="time" id="fEnd" value="10:00">
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-row"><span class="lb"><span class="ic">📍</span>地点 / 注意事项</span></div>
+      <div class="extra-col">
+        <input id="fLoc" placeholder="地点（没有可不填）" maxlength="30">
+        <input id="fNote" placeholder="注意事项（没有可不填）" maxlength="100">
       </div>
     </div>
 
@@ -601,7 +627,9 @@ function planHTML(p,ds,isChild){
     '<div class="plan-meta">';
   if(tm) h+='<span class="chip time">🕐 '+tm.s+"-"+tm.e+'</span>';
   if(p.repeat!=="none") h+='<span class="chip">🔁 '+({daily:"每天",weekday:"工作日",weekly:"每周"})[p.repeat]+'</span>';
+  if(p.loc) h+='<span class="chip">📍 '+esc(p.loc)+'</span>';
   h+='</div>';
+  if(p.note && !isChild) h+='<div class="plan-note">📝 '+esc(p.note)+'</div>';
   if(!isChild && p.children && p.children.length){
     h+='<div class="child">';
     p.children.forEach(function(c){
@@ -748,7 +776,7 @@ function renderTimeline(){
     var top=sm/60*ROW+2, height=Math.max(26,(em-sm)/60*ROW-4);
     html+='<div class="tl-plan'+(isDone(p.id,ds)?" done":"")+'" data-id="'+p.id+'" style="--qc:'+QUADS[p.quad].color+';top:'+top+'px;height:'+height+'px">'+
       '<button class="mini'+(isDone(p.id,ds)?" done":"")+'" data-act="toggle" data-id="'+p.id+'"><svg viewBox="0 0 24 24"><path d="M4 12.5 L10 18.5 L20 6"/></svg></button>'+
-      '<span class="tt">'+esc(p.title)+'</span><span class="tr">'+tm.s+'</span>'+
+      '<span class="tt">'+esc(p.title)+'</span><span class="tr">'+tm.s+(p.loc?' 📍':'')+'</span>'+
       '<span class="tl-resize" title="拖动拉长/缩短"></span></div>';
   });
   html+='</div>';
@@ -922,6 +950,157 @@ function onRszUp(){
   rsz=null; renderAll();
 }
 
+/* ---------- 智能识别：从一段话提取时间/地点/事项/注意事项 ---------- */
+function smartParse(raw){
+  var s=String(raw||"").replace(/\r/g,"").trim();
+  var res={title:"", date:null, timeOn:false, start:"", end:"", loc:"", note:""};
+  var work=s;
+  function cut(str){ work=work.split(str).join("，"); }   // 从待清洗文本里移除已识别片段
+
+  /* 1) 注意事项：含提示词的短句（按逗号/句号分句，只取含提示词的那句） */
+  var notes=[];
+  var kept=[];
+  work.split(/[，。,；;！!！?？\n]+/).forEach(function(cl){
+    cl=cl.trim();
+    if(!cl) return;
+    if(cl.length>=2 && cl.length<=60 && /注意|记得|别忘|务必|不要迟到|准时到|需要带|提前\d+分钟/.test(cl)) notes.push(cl);
+    else kept.push(cl);
+  });
+  work=kept.join("，");
+  if(notes.length) res.note=notes.join("；");
+
+  /* 2) 日期：先看相对词（今天/明天…），再看 X月X日，再看周几 */
+  var d0=new Date(), today=dstr(d0);
+  function mk(y,m,dd){ return y+"-"+pad(m)+"-"+pad(dd); }
+  var mdate=null, dateStr="";
+  if(/大后天/.test(s)){ mdate=addDays(today,3); dateStr="大后天"; }
+  else if(/后天/.test(s)){ mdate=addDays(today,2); dateStr="后天"; }
+  else if(/明天|明早|明晚/.test(s)){ mdate=addDays(today,1); dateStr="明天"; }
+  else if(/今天|今晚|今早/.test(s)){ mdate=today; dateStr="今天"; }
+  if(!mdate){
+    var mm=s.match(/(\d{4})年(\d{1,2})月(\d{1,2})[日号]/);
+    if(mm){ mdate=mk(+mm[1],+mm[2],+mm[3]); dateStr=mm[0]; }
+    else{
+      mm=s.match(/(\d{1,2})月(\d{1,2})[日号]/);
+      if(mm){ var y=d0.getFullYear(); var dt=new Date(y,+mm[1]-1,+mm[2]);
+        if(dt < new Date(y,d0.getMonth(),d0.getDate())) dt=new Date(y+1,+mm[1]-1,+mm[2]);
+        mdate=mk(dt.getFullYear(),dt.getMonth()+1,dt.getDate()); dateStr=mm[0]; }
+    }
+  }
+  if(!mdate){
+    var wm=s.match(/(下下|下)?(?:周|星期|礼拜)([一二三四五六日天])/);
+    if(wm){ var add7 = wm[1]==="下下"?14 : wm[1]==="下"?7 : 0;
+      var idx="一二三四五六日天".indexOf(wm[2]);          // 一=0 … 六=5, 日/天=6
+      var dt;
+      if(wm[1]){                                         // 下周X / 下下周X：从下周一数起
+        var toNextMon=((1-d0.getDay())%7+7)%7; if(toNextMon===0) toNextMon=7;
+        dt=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+toNextMon+(wm[1]==="下下"?7:0)+(idx===6?6:idx));
+      }else{                                             // 本周说法：最近的将来
+        var tgtDay=(idx+1)%7;                            // 转成 getDay: 周日=0
+        var diff=(tgtDay-d0.getDay()+7)%7;
+        dt=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+diff);
+      }
+      mdate=mk(dt.getFullYear(),dt.getMonth()+1,dt.getDate()); dateStr=wm[0]; }
+  }
+  if(mdate) res.date=mdate;
+  if(dateStr) cut(dateStr);
+
+  /* 3) 时间段 */
+  var re=/((?:从)?\s*(凌晨|清晨|早上|上午|中午|下午|傍晚|晚上|夜里|今晚)?\s*(\d{1,2})\s*[点时]\s*(半|一刻|\d{1,2}\s*分?)?|(凌晨|清晨|早上|上午|中午|下午|傍晚|晚上|夜里|今晚)?\s*(\d{1,2})\s*[:：]\s*(\d{2}))/g;
+  var toks=[];
+  var mt;
+  while((mt=re.exec(s))){ toks.push({t:mt[0], i:mt.index, pre:mt[2]||mt[5], h:mt[3]||mt[6], m:mt[4]||mt[7]}); }
+  toks=toks.filter(function(x){ return /点|时|[:：]/.test(x.t); });   // 忽略纯数字，避免误判日期/数量
+  function to24(tok){
+    var h=+tok.h, add=0;
+    if(tok.pre && h<12){
+      if(/下午|傍晚|晚上|夜里|今晚/.test(tok.pre)) add=12;
+      else if(/中午/.test(tok.pre) && h<11) add=12;
+    }
+    var m=0;
+    if(tok.m==="半") m=30;
+    else if(tok.m==="一刻") m=15;
+    else if(tok.m){ m=parseInt(String(tok.m).replace(/\s|分/g,""),10)||0; }
+    return Math.min(1439, h*60+add*60+m);
+  }
+  if(toks.length){
+    var a=toks[0], b=null;
+    for(var i=1;i<toks.length;i++){
+      var gap=s.slice(a.i+a.t.length, toks[i].i);
+      if(/^\s*(?:[-~—–]|至|到)\s*$/.test(gap)){ b=toks[i]; break; }
+    }
+    var sm, em;
+    if(b){
+      sm=to24(a); em=to24(b);
+      if(em<=sm) em=Math.min(1440, em+720);      // "晚上11点到12点" → 到 24:00
+    }else{
+      sm=to24(a); em=Math.min(1440,sm+60);       // 只写一个时间 → 默认 1 小时
+    }
+    if(em>sm){
+      res.timeOn=true; res.start=fmtMin(sm); res.end=fmtMin(em);
+      cut(b ? s.slice(a.i, b.i+b.t.length) : a.t);
+    }
+  }
+
+  /* 4) 地点 */
+  var loc="";
+  var ml=work.match(/(?:地点|位置|地址)\s*[:：]?\s*([^\s，。,；;！!？\n]{2,20})/);
+  if(ml){ loc=ml[1]; cut(ml[0]); }
+  if(!loc){
+    ml=work.match(/在([\u4e00-\u9fa5A-Za-z0-9]{0,12}?(?:公司|学校|图书馆|实验室|教室|会议室|办公室|食堂|餐厅|咖啡|奶茶|操场|健身房|体育馆|医院|诊所|超市|商场|机场|高铁站|火车站|地铁站|车站|银行|公园|宿舍|教学楼|实验楼|家|广场|店|馆|中心|园区|校区|楼下|门口))/);
+    if(ml){ loc=ml[1];
+      var ext=work.slice(ml.index+ml[0].length).match(/^(?:楼下|门口|旁边|院内|门前|南门|北门|侧)/);
+      cut(ml[0]+(ext?ext[0]:"")); if(ext) loc+=ext[0];
+    }
+  }
+  if(!loc){
+    var re2=/([\u4e00-\u9fa5])?在([^\s，。,；;！!！？?\n]{2,10}?)(?=[，。,；;！!？?\s\n]|$|[去来见吃开参进回办走看面试集])/g, m2;
+    while((m2=re2.exec(work))){
+      if(m2[1]==="现"||m2[1]==="实") continue;               // 排除"现在/实在"
+      var cand=m2[2].replace(/^(?:个|到)/,"");
+      if(cand.length>=2){ loc=cand; cut(m2[0]); break; }
+    }
+  }
+  res.loc=loc;
+
+  /* 5) 标题：清洗剩余文本 */
+  var title=work
+    .replace(/^[^\u4e00-\u9fa5A-Za-z0-9（(]+/,"")
+    .replace(/^(?:我|我们|帮你|帮我)(?:要|准备|打算|想|需要|得)?(?:去|参加|到)?/,"")
+    .replace(/^(?:去|参加|到)/,"")
+    .replace(/[，。,；;\s]+$/,"")
+    .trim();
+  if(!title){
+    var seg=s.split(/[，。,；;！!？?\n]/).map(function(x){return x.trim();}).filter(Boolean);
+    title=seg[0]||s.slice(0,15);
+  }
+  if(title.length>30) title=title.slice(0,30);
+  res.title=title;
+  return res;
+}
+window.smartParse=smartParse;   // 便于调试/自动化测试
+$("#aiBtn").addEventListener("click",function(){
+  var raw=$("#fRaw").value.trim();
+  if(!raw){ toast("先粘贴或输入一段话"); $("#fRaw").focus(); return; }
+  var r=smartParse(raw);
+  var found=[];
+  if(r.title){ $("#fTitle").value=r.title; found.push("事项"); }
+  if(r.date){ draft.date=r.date;
+    draft.dateType = r.date===dstr(new Date())?"today" : r.date===addDays(dstr(new Date()),1)?"tomorrow" : "other";
+    $$("#dateTabs button").forEach(function(b){ b.classList.toggle("on", b.dataset.dt===draft.dateType); });
+    $("#fDate").classList.toggle("show", draft.dateType==="other");
+    if(draft.dateType==="other") $("#fDate").value=r.date;
+    found.push("日期"); }
+  if(r.timeOn){ draft.timeOn=true;
+    $("#fTimeOn").classList.add("on"); $("#fTimeBox").classList.add("show");
+    $("#fStart").value=r.start; $("#fEnd").value=r.end; found.push("时间"); }
+  if(r.loc){ $("#fLoc").value=r.loc; found.push("地点"); }
+  if(r.note){ $("#fNote").value=r.note; found.push("注意事项"); }
+  $("#fRaw").value="";
+  toast(found.length? "已识别："+found.join("、") : "没识别出有效信息，试试手动填写");
+});
+$("#fRaw").addEventListener("paste",function(){ setTimeout(function(){ $("#aiBtn").click(); },60); });
+
 /* ---------- 弹窗 ---------- */
 var editing=null, draftSubs=[], draft={};
 function openSheet(id){
@@ -948,6 +1127,9 @@ function openSheet(id){
   $("#fTimeOn").classList.toggle("on", draft.timeOn);
   $("#fTimeBox").classList.toggle("show", draft.timeOn);
   $("#fStart").value=draft.start; $("#fEnd").value=draft.end;
+  $("#fRaw").value="";
+  $("#fLoc").value = editing? (editing.loc||"") : "";
+  $("#fNote").value = editing? (editing.note||"") : "";
   renderSubs();
   $("#mask").classList.add("open");
 }
@@ -1002,15 +1184,17 @@ $("#fOk").addEventListener("click",function(){
   var title=$("#fTitle").value.trim();
   if(!title){ toast("先给计划起个名字吧"); $("#fTitle").focus(); return; }
   var time = draft.timeOn? {s:$("#fStart").value||"09:00", e:$("#fEnd").value||"10:00"} : null;
+  var loc=$("#fLoc").value.trim(), note=$("#fNote").value.trim();
   var date = draft.dateType==="inbox"? null : draft.date;
   if(editing){
     editing.title=title; editing.quad=draft.quad; editing.date=date;
     editing.repeat=draft.repeat; editing.time=time;
+    editing.loc=loc; editing.note=note;
     editing.children=draftSubs;
     clearOvFor(editing.id);          // 清掉当天手工拖动的时间段，让新设置生效
   }else{
     var np={id:uid(),title:title,quad:draft.quad,date:date,time:time,repeat:draft.repeat,
-      children:draftSubs,created:Date.now()};
+      loc:loc,note:note,children:draftSubs,created:Date.now()};
     state.plans.push(np);
     clearOvFor(np.id);
   }
@@ -1149,7 +1333,7 @@ function schedulePlan(p,ds){
   var q=QUADS[p.quad];
   return ntfySend({
     title:(ntf.lead? "还有 "+ntf.lead+" 分钟：" : "")+p.title,
-    msg:effTime(p,ds).s+"-"+effTime(p,ds).e+" · "+q.name,
+    msg:effTime(p,ds).s+"-"+effTime(p,ds).e+" · "+q.name+(p.loc?" · 📍"+p.loc:"")+(p.note?"（"+p.note+"）":""),
     at:at, seq:"plan-"+p.id+"-"+ds
   }).then(function(ok){
     if(ok){ ntf.sent[key]={at:at,st:st}; saveNtf(); updateBell(); }
